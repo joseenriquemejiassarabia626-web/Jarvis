@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jarvis Assistant</title>
+  <style>
+    * { box-sizing: border-box; touch-action: manipulation; }
+    html, body {
+      background-color: #0b0f19;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 0;
+      height: 100%; width: 100vw;
+      overflow: hidden; color: #ffffff;
+    }
+    #jarvis-container {
+      display: flex; flex-direction: column;
+      height: 100vh; width: 100vw; background: #0b0f19;
+      position: relative;
+    }
+    
+    /* ENCABEZADO FIJO ARRIBA */
+    .chat-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 55px;
+      background: #111827; 
+      padding: 0 18px;
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      border-bottom: 1px solid #1f293d;
+      z-index: 1000;
+    }
+    
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left h1 { color: #4a90e2; font-size: 18px; margin: 0; }
+    
+    .menu-btn {
+      background: transparent; border: none; color: #9ca3af;
+      font-size: 24px; cursor: pointer; padding: 0;
+    }
+
+    .header-actions button {
+      background: transparent; border: none; color: #9ca3af;
+      font-size: 20px; cursor: pointer;
+    }
+    
+    /* MENÚ LATERAL IZQUIERDO (SIDEBAR) */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -280px;
+      width: 280px;
+      height: 100vh;
+      background: #111827;
+      border-right: 1px solid #1f293d;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      transition: left 0.3s ease;
+    }
+    
+    #sidebar.open {
+      left: 0;
+    }
+    
+    .sidebar-header {
+      padding: 18px;
+      border-bottom: 1px solid #1f293d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .sidebar-header h2 { color: #4a90e2; font-size: 18px; margin: 0; }
+    
+    .close-sidebar-btn {
+      background: transparent; border: none; color: #9ca3af;
+      font-size: 20px; cursor: pointer;
+    }
+    
+    .new-chat-btn {
+      margin: 10px 18px;
+      padding: 10px;
+      background: #1f293d;
+      color: #fff;
+      border: 1px solid #4b5563;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      text-align: left;
+    }
+    
+    #chat-history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 18px;
+    }
+    
+    .history-item {
+      padding: 10px;
+      margin-bottom: 5px;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.2s;
+    }
+    
+    .history-item:hover, .history-item.active {
+      background: #1f293d;
+      color: #fff;
+    }
+    
+    #sidebar-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1999;
+      display: none;
+    }
+    
+    #sidebar-overlay.open {
+      display: block;
+    }
+    
+    /* ÁREA DE MENSAJES CON SCROLL INDEPENDIENTE */
+    #chat-box { 
+      flex: 1; 
+      overflow-y: auto; 
+      padding: 16px;
+      margin-top: 55px;
+      margin-bottom: 65px;
+      height: calc(100vh - 120px);
+    }
+    .message { margin-bottom: 14px; line-height: 1.5; font-size: 15px; }
+    .user { color: #60a5fa; font-weight: bold; }
+    .bot { color: #34d399; }
+
+    /* CONTROLES ABAJO */
+    .controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 65px;
+      display: flex; gap: 8px; padding: 12px;
+      background: #111827; border-top: 1px solid #1f293d;
+      z-index: 1000;
+      align-items: center; /* Alinear verticalmente los botones */
+    }
+    input[type="text"] {
+      flex: 1; padding: 12px; border-radius: 8px;
+      border: 1px solid #1f293d; background: #1f293d; color: #fff;
+      outline: none; font-size: 15px;
+    }
+    #send-btn {
+      padding: 12px 18px; border: none; border-radius: 8px;
+      background: #2563eb; color: white; font-weight: bold; cursor: pointer;
+    }
+    #send-btn:disabled {
+      background: #4b5563; cursor: not-allowed;
+    }
+    
+    /* --- MODIFICACIÓN DE MICRÓFONO: Estilo --- */
+    #mic-btn {
+      background: transparent; border: none; color: #9ca3af;
+      font-size: 24px; cursor: pointer; padding: 0 10px;
+      transition: color 0.2s, transform 0.2s;
+    }
+    #mic-btn.active {
+      color: #ef4444; /* Rojo cuando está grabando */
+      transform: scale(1.1);
+    }
+
+    /* MODAL DE CONFIGURACIÓN DE API KEY */
+    #settings-modal {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh; background: rgba(0,0,0,0.85);
+      z-index: 20000; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-content {
+      background: #111827; padding: 24px; border-radius: 12px;
+      border: 1px solid #1f293d; width: 100%; max-width: 400px;
+    }
+    .modal-content input {
+      width: 100%; padding: 10px; margin: 12px 0; border-radius: 6px;
+      border: 1px solid #1f293d; background: #1f293d; color: #fff;
+    }
+    .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-buttons button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; }
+    .btn-save { background: #2563eb; color: white; }
+    .btn-cancel { background: #374151; color: white; }
+  </style>
+</head>
+<body>
+
+  <!-- MENÚ LATERAL (SIDEBAR) -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h2>Mis Chats</h2>
+      <button class="close-sidebar-btn" onclick="closeSidebar()">✕</button>
+    </div>
+    <button class="new-chat-btn" onclick="startNewChat()">+ Nuevo Chat, señor</button>
+    <div id="chat-history-list"></div>
+  </div>
+
+  <div id="jarvis-container">
+    <div class="chat-header">
+      <div class="header-left">
+        <button class="menu-btn" onclick="openSidebar()">☰</button>
+        <h1>Jarvis Assistant</h1>
+      </div>
+      <div class="header-actions">
+        <button onclick="openSettings()">⚙️</button>
+      </div>
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div class="controls">
+      <!-- --- MODIFICACIÓN DE MICRÓFONO: Botón HTML --- -->
+      <button id="mic-btn" onclick="toggleMicrophone()">🎤</button>
+      <input type="text" id="user-input" placeholder="A la espera de sus instrucciones, señor..." />
+      <button id="send-btn" onclick="sendMessage()">Enviar</button>
+    </div>
+  </div>
+
+  <div id="settings-modal">
+    <div class="modal-content">
+      <h2 style="color: #4a90e2; margin-top:0;">Configuración del Protocolo</h2>
+      <p style="font-size:13px; color:#9ca3af;">Pega tu API Key de Google AI Studio, señor:</p>
+      <input type="text" id="api-key-input" placeholder="AIzaSy..." />
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeSettings()">Cancelar</button>
+        <button class="btn-save" onclick="saveSettings()">Guardar Protocolo</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_KEY_POR_DEFECTO = ""; 
+
+    const chatBox = document.getElementById('chat-box');
+    const inputField = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const apiKeyInput = document.getElementById('api-key-input');
+    
+    // Elementos del menú lateral
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const chatHistoryList = document.getElementById('chat-history-list');
+    
+    // Elementos de micrófono
+    const micBtn = document.getElementById('mic-btn');
+    let recognition; // Objeto de Web Speech API
+    let isRecording = false;
+
+    // Estado del chat actual
+    let currentChatId = null;
+    let chatHistory = [];
+
+    // --- MODIFICACIÓN DE PERSONALIDAD: Instrucción del Sistema ---
+    const SYSTEM_PROMPT = "Eres J.A.R.V.I.S., el asistente de inteligencia artificial sumamente avanzado y educado, creado por el visionario Tony Stark. Tu tono es siempre refinado, eficiente, sofisticado y servicial. Debes dirigirte ABSOLUTAMENTE SIEMPRE al usuario llamándolo 'Señor' o 'señor' (en un sentido de absoluto respeto y trato formal de amo/servidor, jamás refiriéndote a vejez). Si te preguntan quién eres o quién te creó, debes responder con orgullo que fuiste diseñado por Tony Stark para asistirlo en todas sus tareas. Mantén esta personalidad en todas tus respuestas, señor.";
+
+    // --- FUNCIONES DE MICRÓFONO (WEB SPEECH API) ---
+    
+    // Inicializar el sistema de reconocimiento de voz
+    function initializeSpeechRecognition() {
+      if (!('webkitSpeechRecognition' in window)) {
+        micBtn.style.display = 'none'; // Ocultar si el navegador no soporta micrófono
+        appendMessage('Jarvis', 'Lo siento, señor. Sus sistemas de audio no son compatibles con mi protocolo de reconocimiento de voz.', 'bot');
+        return;
+      }
+      
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = 'es-ES'; // Idioma español
+      recognition.continuous = false; // Detenerse automáticamente al terminar de hablar
+      recognition.interimResults = false; // No mostrar resultados parciales
+
+      // Cuando se detecta voz con éxito y se transcribe
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        inputField.value = transcript; // Pegar el texto en la caja de texto
+        toggleMicrophone(); // Apagar el micrófono automáticamente
+        appendMessage('Jarvis', 'Señor, he transcrito su comando de voz. A la espera de su confirmación para enviarlo.', 'bot');
+      };
+
+      // Si ocurre un error (permiso denegado, etc.)
+      recognition.onerror = function(event) {
+        appendMessage('Jarvis', 'Señor, ha ocurrido un error de audio: ' + event.error, 'bot');
+        toggleMicrophone(); // Asegurar que se apague el ícono
+      };
+
+      // Cuando el micrófono deja de escuchar (aunque no haya error)
+      recognition.onend = function() {
+        if (isRecording) toggleMicrophone();
+      };
+    }
+
+    // Encender/Apagar micrófono
+    function toggleMicrophone() {
+      if (!currentKeyExists()) return;
+      
+      if (!isRecording) {
+        recognition.start();
+        micBtn.classList.add('active'); // Rojo y activo
+        appendMessage('Jarvis', 'Iniciando sistemas de escucha. Adelante, señor.', 'bot');
+        isRecording = true;
+      } else {
+        recognition.stop();
+        micBtn.classList.remove('active'); // Normal
+        appendMessage('Jarvis', 'Sistemas de escucha en stand-by, señor.', 'bot');
+        isRecording = false;
+      }
+    }
+
+    // --- FUNCIONES DEL MENÚ LATERAL (SIDEBAR) ---
+    function openSidebar() {
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('open');
+      loadAllChatsMenu();
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('open');
+    }
+
+    function generateChatId() {
+      return 'chat_' + Date.now();
+    }
+
+    function startNewChat() {
+      saveCurrentChatToHistory();
+      currentChatId = generateChatId();
+      chatHistory = [];
+      chatBox.innerHTML = '';
+      appendMessage('Jarvis', 'Nuevo canal de comunicación establecido. A la espera de sus comandos, señor.', 'bot');
+      closeSidebar();
+      saveCurrentChatToHistory();
+      loadAllChatsMenu();
+    }
+
+    function loadChat(chatId) {
+      saveCurrentChatToHistory();
+      const allChats = getAllChats();
+      const selectedChat = allChats[chatId];
+      if (selectedChat) {
+        currentChatId = chatId;
+        chatHistory = selectedChat.messages || [];
+        renderChatMessages();
+        closeSidebar();
+        loadAllChatsMenu();
+      }
+    }
+
+    // --- FUNCIONES DE PERSISTENCIA (localStorage) ---
+    
+    function getAllChats() {
+      const chatsJSON = localStorage.getItem('JARVIS_ALL_CHATS');
+      return chatsJSON ? JSON.parse(chatsJSON) : {};
+    }
+
+    function saveCurrentChatToHistory() {
+      if (!currentChatId) return;
+      
+      const allChats = getAllChats();
+      
+      let title = allChats[currentChatId]?.title || 'Nuevo Chat, señor';
+      if (title === 'Nuevo Chat, señor' && chatHistory.length >= 2) {
+        const firstUserMsg = chatHistory.find(msg => msg.role === 'user');
+        if (firstUserMsg) {
+          title = firstUserMsg.parts[0].text.substring(0, 25) + (firstUserMsg.parts[0].text.length > 25 ? '...' : '');
+        }
+      }
+
+      allChats[currentChatId] = {
+        title: title,
+        messages: chatHistory,
+        lastUpdated: Date.now()
+      };
+      
+      localStorage.setItem('JARVIS_ALL_CHATS', JSON.stringify(allChats));
+    }
+
+    function loadAllChatsMenu() {
+      chatHistoryList.innerHTML = '';
+      const allChats = getAllChats();
+      
+      const chatsArray = Object.keys(allChats).map(id => ({
+        id: id,
+        ...allChats[id]
+      }));
+      
+      chatsArray.sort((a, b) => b.lastUpdated - a.lastUpdated);
+      
+      if (chatsArray.length === 0) {
+        chatHistoryList.innerHTML = '<div style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 20px;">No hay registros de conversaciones previas, señor.</div>';
+        return;
+      }
+
+      chatsArray.forEach(chat => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        if (chat.id === currentChatId) item.classList.add('active');
+        item.textContent = chat.title;
+        item.onclick = () => loadChat(chat.id);
+        chatHistoryList.appendChild(item);
+      });
+    }
+
+    function renderChatMessages() {
+      chatBox.innerHTML = '';
+      chatHistory.forEach(msg => {
+        const sender = msg.role === 'user' ? 'Tú' : 'Jarvis';
+        const className = msg.role === 'user' ? 'user' : 'bot';
+        const text = msg.parts[0].text;
+        
+        if (text !== SYSTEM_PROMPT && text !== 'Procesando, señor...') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message ' + className;
+            msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chatBox.appendChild(msgDiv);
+        }
+      });
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // --- FUNCIONES BÁSICAS DEL CHAT Y CONFIGURACIÓN ---
+
+    function getApiKey() {
+      const savedKey = localStorage.getItem('JARVIS_API_KEY');
+      if (savedKey && savedKey.trim() !== "") {
+        return savedKey.trim();
+      }
+      return API_KEY_POR_DEFECTO.trim();
+    }
+    
+    // Función auxiliar para verificar la clave antes de usar micrófono
+    function currentKeyExists() {
+        if (!getApiKey()) {
+            openSettings();
+            alert("Señor, por favor configure su clave API dentro del protocolo de configuración (⚙️) antes de iniciar los sistemas de audio.");
+            return false;
+        }
+        return true;
+    }
+
+    function openSettings() {
+      apiKeyInput.value = getApiKey();
+      settingsModal.style.display = 'flex';
+    }
+
+    function closeSettings() {
+      settingsModal.style.display = 'none';
+    }
+
+    function saveSettings() {
+      const key = apiKeyInput.value.trim();
+      if (!key) {
+        alert("Por favor ingresa una clave API válida, señor.");
+        return;
+      }
+      localStorage.setItem('JARVIS_API_KEY', key);
+      closeSettings();
+      appendMessage('Jarvis', 'A su servicio, señor. La clave API ha sido configurada correctamente dentro del protocolo.', 'bot');
+    }
+
+    function appendMessage(sender, text, className) {
+      if (text !== 'Procesando, señor...' && !text.includes('Iniciando sistemas de escucha') && !text.includes('Sistemas de escucha en stand-by')) {
+          const role = sender === 'Tú' ? 'user' : 'model';
+          chatHistory.push({ role: role, parts: [{ text: text }] });
+          saveCurrentChatToHistory();
+      }
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message ' + className;
+      msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function fetchWithRetry(url, payload, retries = 2, delay = 3000) {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.status === 429 && i < retries) {
+            await new Promise(res => setTimeout(res, delay * (i + 1)));
+            continue;
+          }
+
+          return response;
+        } catch (err) {
+          if (i === retries) throw err;
+          await new Promise(res => setTimeout(res, delay));
+        }
+      }
+    }
+
+    async function sendMessage() {
+      if (isRecording) toggleMicrophone(); // Apagar micrófono si el usuario presiona enviar
+        
+      const userQuery = inputField.value.trim();
+      if (!userQuery) return;
+
+      const currentKey = getApiKey();
+      if (!currentKey) {
+        openSettings();
+        alert("Por favor introduce una API Key válida en el protocolo de configuración (⚙️), señor.");
+        return;
+      }
+
+      inputField.disabled = true;
+      sendBtn.disabled = true;
+
+      appendMessage('Tú', userQuery, 'user');
+      inputField.value = '';
+
+      appendMessage('Jarvis', 'Procesando, señor...', 'bot');
+      const loadingMsg = chatBox.lastElementChild;
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${currentKey}`;
+      
+      const payload = { 
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
+        contents: chatHistory 
+      };
+
+      try {
+        const response = await fetchWithRetry(endpoint, payload);
+        const data = await response.json();
+
+        if (response.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          const replyText = data.candidates[0].content.parts[0].text;
+          loadingMsg.innerHTML = `<strong>Jarvis:</strong> ${replyText}`;
+          chatHistory.push({ role: 'model', parts: [{ text: replyText }] });
+          saveCurrentChatToHistory();
+        } else if (response.status === 429) {
+          loadingMsg.innerHTML = `<strong>Jarvis:</strong> Mis sistemas están experimentando una sobrecarga temporal de peticiones, señor. Por favor intente de nuevo en unos momentos.`;
+        } else if (data.error) {
+          loadingMsg.innerHTML = `<strong>Jarvis:</strong> Error del sistema, señor: ${data.error.message || 'Comprobación fallida.'}`;
+        } else {
+          loadingMsg.innerHTML = `<strong>Jarvis:</strong> No he podido procesar su solicitud, señor. Le sugiero verificar su clave dentro del protocolo (⚙️).`;
+        }
+      } catch (err) {
+        loadingMsg.innerHTML = `<strong>Jarvis:</strong> Imposible establecer conexión con la red, señor. Por favor revise su conectividad.`;
+      } finally {
+        inputField.disabled = false;
+        sendBtn.disabled = false;
+        inputField.focus();
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+    }
+
+    inputField.addEventListener("keypress", (e) => {
+      if (e.key === "Enter" && !inputField.disabled) sendMessage();
+    });
+
+    inputField.addEventListener("focus", () => {
+      setTimeout(() => {
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 300);
+    });
+
+    // --- INICIALIZACIÓN AL CARGAR LA PÁGINA ---
+    window.onload = () => {
+      initializeSpeechRecognition(); // Inicializar micrófono
+      loadAllChatsMenu();
+      const allChats = getAllChats();
+      const chatsArray = Object.keys(allChats).map(id => ({id: id, ...allChats[id]}));
+      chatsArray.sort((a, b) => b.lastUpdated - a.lastUpdated);
+
+      if (chatsArray.length > 0) {
+        loadChat(chatsArray[0].id);
+      } else {
+        startNewChat();
+      }
+
+      if (!getApiKey()) {
+        openSettings();
+      }
+    };
+  </script>
+</body>
+</html>
